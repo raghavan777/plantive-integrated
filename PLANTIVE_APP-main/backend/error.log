@@ -1,0 +1,37 @@
+﻿node : (node:13752) 
+[MONGOOSE] Warning: 
+Duplicate schema index 
+on {"submissionId":1} 
+found. This is often 
+due to declaring an 
+index using both 
+"index: true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+At line:1 char:1
++ node server.js 2>&1 
+| Out-File -FilePath 
+error.log -Encoding 
+utf8
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : 
+NotSpecified    : 
+((node:13752) [M.    
+..dex definition.:S    
+tring) [], RemoteEx    
+ception
+    + 
+FullyQualifiedErr    
+orId : NativeComman    
+dError
+ 
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+Γä╣∩╕Å MongoDB Connected: localhost
+Γä╣∩╕Å MongoDB Connected
+Γä╣∩╕Å Server running in development mode on port 5000
