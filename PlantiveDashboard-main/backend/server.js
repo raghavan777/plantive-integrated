@@ -4,6 +4,8 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,6 +14,14 @@ const logger = require('./utils/logger');
 const websocketService = require('./services/websocketService');
 const realtimeSocket = require('./sockets/realtimeSocket');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+
+const allowedOrigins = [
+    'http://localhost:5173', // Dashboard
+    'http://localhost:3000', // Website (Next.js)
+    'http://localhost:8081', // Expo Web
+    'http://localhost:19006', // Expo Go
+    process.env.CLIENT_URL
+].filter(Boolean);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/authRoutes');
@@ -23,6 +33,10 @@ const imageRoutes = require('./routes/imageRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const officialRoutes = require('./routes/officialRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const farmRoutes = require('./routes/farmRoutes');
+const verificationRoutes = require('./routes/verificationRoutes');
 
 // ── Ensure required directories exist ────────────────────────────────────────
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -41,7 +55,14 @@ const server = http.createServer(app);
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || '*',
+        origin: (origin, callback) => {
+            if (!origin) return callback(null, true);
+            if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         methods: ['GET', 'POST'],
         credentials: true,
     },
@@ -55,12 +76,35 @@ realtimeSocket(io);
 
 // ── Global Middleware ─────────────────────────────────────────────────────────
 app.use(cors({
-    origin: process.env.CLIENT_URL || '*',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
 }));
 
+// ── API Configuration ────────────────────────────────────────────────────────
+const API = '/api';
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Security Middleware
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again after 15 minutes'
+});
+app.use(`${API}/`, limiter);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
@@ -77,7 +121,6 @@ app.get('/health', (req, res) => {
 });
 
 // ── API Routes ────────────────────────────────────────────────────────────────
-const API = '/api';
 
 app.use(`${API}/auth`, authRoutes);
 app.use(`${API}/users`, userRoutes);
@@ -88,6 +131,10 @@ app.use(`${API}/images`, imageRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.use(`${API}/ai`, aiRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
+app.use(`${API}/officials`, officialRoutes);
+app.use(`${API}/dashboard`, dashboardRoutes);
+app.use(`${API}/farms`, farmRoutes);
+app.use(`${API}/verification`, verificationRoutes);
 
 // ── Error Handling ────────────────────────────────────────────────────────────
 app.use(notFound);

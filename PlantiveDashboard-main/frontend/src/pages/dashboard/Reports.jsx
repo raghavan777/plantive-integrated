@@ -46,14 +46,14 @@ const Reports = () => {
           officer: {
             name: r.generatedBy?.name || r.author?.name || 'Assigned Officer',
             badgeNumber: r.generatedBy?.employeeId || 'OFF-' + (idx + 1).toString().padStart(3, '0'),
-            phone: r.generatedBy?.phone || '+91 99999 99999',
-            email: r.generatedBy?.email || 'officer@pmfby.gov.in'
+            phone: r.generatedBy?.phone || 'N/A',
+            email: r.generatedBy?.email || 'N/A'
           },
           farmer: {
             name: r.farmer?.name || r.target?.name || 'Unknown Farmer',
             farmerId: r.farmer?.farmerId || r.target?.id || 'Unknown ID',
-            phone: r.farmer?.contact?.phone || '+91 XXXXX XXXXX',
-            village: r.farmer?.location?.village || r.region || 'Unknown Village'
+            phone: r.farmer?.contact?.phone || 'N/A',
+            village: r.farmer?.location?.village || r.region || 'N/A'
           },
           type: r.type || r.reportType || 'crop_health',
           title: r.title || r.reportName || 'Field Assessment Report',

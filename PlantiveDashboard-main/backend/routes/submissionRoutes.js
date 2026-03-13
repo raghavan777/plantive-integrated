@@ -1,26 +1,32 @@
 const express = require('express');
 const router = express.Router();
-const { getSubmissions, getSubmission, createSubmission, verifySubmission } = require('../controllers/submissionController');
+const { 
+    getSubmissions, 
+    getSubmission, 
+    createSubmission, 
+    verifySubmission,
+    getSubmissionHistory,
+    getSubmissionStatus
+} = require('../controllers/submissionController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
-const multer = require('multer');
-const path = require('path');
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => cb(null, `submission-${Date.now()}${path.extname(file.originalname)}`),
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.use(protect);
 
+// Farmer Specific Routes (priority over generic :id)
+router.get('/history', getSubmissionHistory);
+router.get('/status', getSubmissionStatus);
+
+// Generic CRUD Routes
 router.route('/')
     .get(getSubmissions)
-    .post(upload.array('images', 10), createSubmission);
+    .post(createSubmission); // Both farmer and staff can submit
 
 router.route('/:id')
-    .get(getSubmission);
+    .get(getSubmission)
+    .put(authorizeRoles('admin', 'agriofficer'), verifySubmission);
 
+// Mobile Compatibility Alias
 router.put('/:id/verify', authorizeRoles('admin', 'agriofficer'), verifySubmission);
 
 module.exports = router;

@@ -46,13 +46,19 @@ const userSchema = new mongoose.Schema({
     },
     passwordChangedAt: Date,
     passwordResetToken: String,
-    passwordResetExpires: Date
+    passwordResetExpires: Date,
+    otp: {
+        type: String,
+        default: null
+    },
+    otpExpires: {
+        type: Date,
+        default: null
+    }
 }, {
     timestamps: true
 });
 
-// Index for email lookups
-userSchema.index({ email: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

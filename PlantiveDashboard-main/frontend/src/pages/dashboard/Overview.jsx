@@ -3,6 +3,7 @@ import { getFarmers } from '../../services/api/farmers.api';
 import { getSubmissions } from '../../services/api/submissions.api';
 import { getPlots } from '../../services/api/plots.api';
 import { getUsers } from '../../services/api/users.api';
+import { getDashboardStats } from '../../services/api/officials.api';
 import {
   TrendingUp,
   TrendingDown,
@@ -27,78 +28,34 @@ const Overview = () => {
   const [stats, setStats] = useState({});
   const [recentActivity, setRecentActivity] = useState([]);
   const [systemStatus, setSystemStatus] = useState({});
-
+  const [regionalCoverage, setRegionalCoverage] = useState([]);
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch basic data
-      const [farmersRes, submissionsRes, plotsRes, usersRes] = await Promise.allSettled([
-        getFarmers(),
-        getSubmissions(),
-        getPlots(),
-        getUsers({ role: 'district_officer' })
-      ]);
-
-      const farmersList = farmersRes.status === 'fulfilled' && farmersRes.value?.data ? farmersRes.value.data : 
-                          (Array.isArray(farmersRes.value) ? farmersRes.value : []);
-      
-      const submissionsList = submissionsRes.status === 'fulfilled' && submissionsRes.value?.data ? submissionsRes.value.data : 
-                              (Array.isArray(submissionsRes.value) ? submissionsRes.value : []);
-      
-      const plotsList = plotsRes.status === 'fulfilled' && plotsRes.value?.data ? plotsRes.value.data : 
-                        (Array.isArray(plotsRes.value) ? plotsRes.value : []);
-
-      const officersList = usersRes.status === 'fulfilled' && usersRes.value?.data ? usersRes.value.data : 
-                           (Array.isArray(usersRes.value) ? usersRes.value : []);
-
-      // Calculate stats based on real data
-      const damageCases = submissionsList.filter(s => s.submissionType === 'damage_report' || s.verification?.stage === 'inspection').length;
-      const verifiedSubmissions = submissionsList.filter(s => s.status === 'verified').length;
-      const pendingSubmissions = submissionsList.filter(s => s.status === 'pending').length;
-      
-      // Calculate coverage area (sum of all plot areas in hectares)
-      const totalArea = plotsList.reduce((sum, plot) => {
-        const val = plot.area?.value || 0;
-        // Basic normalization if units differ (optional)
-        return sum + val;
-      }, 0);
+      const statsRes = await getDashboardStats();
+      const dashboardData = statsRes.data;
 
       setStats({
-        totalFarmers: farmersList.length || 0,
-        farmersChange: farmersList.length > 0 ? 5 : 0, 
-        imagesAnalyzed: submissionsList.length || 0, 
-        imagesChange: submissionsList.length > 0 ? 8 : 0,
-        activeOfficers: officersList.length || 5, // Default to 5 if no real officers found yet
+        totalFarmers: dashboardData.totalFarmers,
+        farmersChange: 5, // Keep static for now or track trend
+        imagesAnalyzed: dashboardData.imagesAnalyzed,
+        imagesChange: 8,
+        activeOfficers: dashboardData.activeOfficers,
         officersChange: 0,
-        damageCases: damageCases,
-        damageChange: damageCases > 0 ? -2 : 0,
-        pendingApprovals: pendingSubmissions,
-        completedVisits: verifiedSubmissions,
-        aiAccuracy: 95.0, 
-        coverageArea: totalArea > 0 ? parseFloat(totalArea.toFixed(1)) : 0
+        damageCases: dashboardData.damageCases,
+        damageChange: -2,
+        pendingApprovals: dashboardData.pendingApprovals,
+        completedVisits: dashboardData.completedVisits,
+        aiAccuracy: dashboardData.aiAccuracy,
+        coverageArea: dashboardData.totalArea
       });
 
-      // Map real submissions to recent activity
-      const recent = submissionsList.slice(0, 5).map(sub => ({
-        id: sub._id,
-        type: sub.submissionType,
-        title: sub.submissionType === 'damage_report' ? 'Damage reported' : 'New submission',
-        description: sub.description || 'Farmer submitted data',
-        time: new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: sub.status,
-        icon: sub.submissionType === 'damage_report' ? '⚠️' : '📸'
-      }));
-
-      setRecentActivity(recent.length > 0 ? recent : [
+      setRecentActivity(dashboardData.recentActivity.length > 0 ? dashboardData.recentActivity : [
         { id: 'empty', title: 'No recent activity', description: 'Data will appear here once farmers submit reports.', status: 'operational', icon: 'ℹ️', time: '' }
       ]);
 
-      setSystemStatus({
-        aiAnalysis: { status: 'operational', latency: '120ms' },
-        imageProcessing: { status: 'operational', queue: 0 },
-        dataSync: { status: 'active', lastSync: 'Just now' },
-        apiHealth: { status: 'healthy', uptime: '99.9%' }
-      });
+      setSystemStatus(dashboardData.systemStatus);
+      setRegionalCoverage(dashboardData.regionalCoverage || []);
 
     } catch (error) {
       console.error("Error fetching overview data", error);
@@ -285,7 +242,7 @@ const Overview = () => {
                 </div>
                 <div>
                   <div className="font-bold text-[15px] text-gray-800 font-heading">View Pending Approvals</div>
-                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">8 approvals waiting</div>
+                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">{stats.pendingApprovals} approvals waiting</div>
                 </div>
               </div>
               <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-50 transition-colors">
@@ -300,7 +257,7 @@ const Overview = () => {
                 </div>
                 <div>
                   <div className="font-bold text-[15px] text-gray-800 font-heading">Check Damage Alerts</div>
-                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">12 active cases</div>
+                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">{stats.damageCases} active cases</div>
                 </div>
               </div>
               <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-50 transition-colors">
@@ -314,7 +271,7 @@ const Overview = () => {
                 </div>
                 <div>
                   <div className="font-bold text-[15px] text-gray-800 font-heading">Generate Reports</div>
-                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">Monthly analytics</div>
+                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">Real-time analytics</div>
                 </div>
               </div>
               <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-50 transition-colors">
@@ -328,7 +285,7 @@ const Overview = () => {
                 </div>
                 <div>
                   <div className="font-bold text-[15px] text-gray-800 font-heading">Monitor Field Officers</div>
-                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">23 officers active</div>
+                  <div className="text-[13px] font-medium text-gray-500 mt-0.5">{stats.activeOfficers} officers active</div>
                 </div>
               </div>
               <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-50 transition-colors">
@@ -457,42 +414,23 @@ const Overview = () => {
             Regional Coverage
           </h3>
           <div className="space-y-4 flex-1">
-            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/50 transition-colors">
-              <span className="text-[14px] font-semibold text-gray-600">Pune District</span>
-              <div className="flex items-center gap-3">
-                 <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                   <div className="h-full bg-blue-500 rounded-full" style={{width: '85%'}}></div>
-                 </div>
-                 <span className="font-bold text-[14px] text-blue-600 tabular-nums">85%</span>
+            {regionalCoverage.length > 0 ? (
+              regionalCoverage.map((region, idx) => (
+                <div key={idx} className={`flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/50 transition-colors ${idx % 2 === 1 ? 'bg-white/40' : ''}`}>
+                  <span className="text-[14px] font-semibold text-gray-600">{region.name}</span>
+                  <div className="flex items-center gap-3">
+                     <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                       <div className="h-full bg-blue-500 rounded-full" style={{width: `${region.percentage}%`}}></div>
+                     </div>
+                     <span className="font-bold text-[14px] text-blue-600 tabular-nums">{region.percentage}%</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 italic">
+                No regional data available
               </div>
-            </div>
-            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/50 transition-colors bg-white/40">
-              <span className="text-[14px] font-semibold text-gray-600">Nashik Region</span>
-              <div className="flex items-center gap-3">
-                 <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                   <div className="h-full bg-blue-500 rounded-full" style={{width: '78%'}}></div>
-                 </div>
-                 <span className="font-bold text-[14px] text-blue-600 tabular-nums">78%</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/50 transition-colors">
-              <span className="text-[14px] font-semibold text-gray-600">Nagpur Division</span>
-              <div className="flex items-center gap-3">
-                 <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                   <div className="h-full bg-blue-500 rounded-full" style={{width: '65%'}}></div>
-                 </div>
-                 <span className="font-bold text-[14px] text-blue-600 tabular-nums">65%</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/50 transition-colors bg-white/40">
-              <span className="text-[14px] font-semibold text-gray-600">Aurangabad Zone</span>
-              <div className="flex items-center gap-3">
-                 <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                   <div className="h-full bg-blue-500 rounded-full" style={{width: '72%'}}></div>
-                 </div>
-                 <span className="font-bold text-[14px] text-blue-600 tabular-nums">72%</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

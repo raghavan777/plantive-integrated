@@ -62,9 +62,9 @@ export default function FarmerProfileScreen() {
     bankName: profile?.bank?.bankName || '--',
     accountNumber: profile?.bank?.accountNumber || '--',
     ifscCode: profile?.bank?.ifscCode || '--',
-    insuranceCoverage: profile?.insurance?.coverage || '--',
-    premiumPaid: profile?.insurance?.premium || '--',
-    validity: profile?.insurance?.validity || '--',
+    insuranceCoverage: profile?.insurance?.coverageAmount ? `₹ ${profile?.insurance.coverageAmount.toLocaleString()}` : '₹ 0',
+    premiumPaid: profile?.insurance?.premiumPaid ? `₹ ${profile?.insurance.premiumPaid.toLocaleString()}` : '--',
+    validity: profile?.insurance?.validUntil ? new Date(profile.insurance.validUntil).toLocaleDateString() : '--',
     totalSubmissions: profile?.plots?.length || 0,
     approvedClaims: 0,
     pendingClaims: 0,
@@ -77,6 +77,7 @@ export default function FarmerProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedField, setSelectedField] = useState('');
+  const [selectedApiKey, setSelectedApiKey] = useState('');
   const [editValue, setEditValue] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(30));
@@ -106,16 +107,39 @@ export default function FarmerProfileScreen() {
     );
   };
 
-  const handleEditField = (field: string, value: string) => {
-    setSelectedField(field);
+  const handleEditField = (label: string, apiKey: string, value: string) => {
+    setSelectedField(label);
+    setSelectedApiKey(apiKey);
     setEditValue(value);
     setEditModalVisible(true);
   };
 
-  const saveEdit = () => {
-    // In a real app, update the data via API
-    Alert.alert('Updated', `${selectedField} updated successfully`);
-    setEditModalVisible(false);
+  const saveEdit = async () => {
+    try {
+      const updateData = { [selectedApiKey]: editValue };
+      
+      const response = await fetch(API_ENDPOINTS.FARMERS.PROFILE, {
+        method: 'PUT',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        Alert.alert('Success', `${selectedField} updated successfully`);
+        fetchFarmerProfile();
+      } else {
+        Alert.alert('Error', data.message || 'Failed to update');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Connection failed');
+    } finally {
+      setEditModalVisible(false);
+    }
   };
 
   const menuItems = [
@@ -249,48 +273,106 @@ export default function FarmerProfileScreen() {
           <View style={styles.sectionHeader}>
             <Feather name="user" size={20} color={COLORS.primary} />
             <Text style={styles.sectionTitle}>Personal Information</Text>
-            {isEditing && (
-              <TouchableOpacity onPress={() => handleEditField('personal', '')}>
-                <Feather name="edit-2" size={16} color={COLORS.gray} />
-              </TouchableOpacity>
-            )}
           </View>
           
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Full Name</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Full Name</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Full Name', 'name', displayData.fullName)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.fullName}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Father's Name</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Father's Name</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Father\'s Name', 'fatherName', displayData.fatherName)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.fatherName}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Mobile Number</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Mobile Number</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Mobile Number', 'contact.phone', displayData.mobile)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.mobile}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Email</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Email</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Email', 'contact.email', displayData.email)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.email}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Age</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Age</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Age', 'age', displayData.age.toString())}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.age} years</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Gender</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Gender</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Gender', 'gender', displayData.gender)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.gender}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Farmer Type</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Farmer Type</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Farmer Type', 'farmerType', displayData.farmerType)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.farmerType}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Category</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Category</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Category', 'farmerCategory', displayData.farmerCategory)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.farmerCategory}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Aadhaar (UID)</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.infoLabel}>Aadhaar (UID)</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Aadhaar', 'uidNumber', displayData.uidNumber)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.infoValue}>{displayData.uidNumber}</Text>
             </View>
           </View>
@@ -301,26 +383,51 @@ export default function FarmerProfileScreen() {
           <View style={styles.sectionHeader}>
             <Feather name="map-pin" size={20} color="#4CAF50" />
             <Text style={styles.sectionTitle}>Address Details</Text>
-            {isEditing && (
-              <TouchableOpacity onPress={() => handleEditField('address', '')}>
-                <Feather name="edit-2" size={16} color={COLORS.gray} />
-              </TouchableOpacity>
-            )}
           </View>
           
           <View style={styles.addressCard}>
+            <View style={styles.infoLabelRow}>
+              <Text style={styles.addressLabel}>Full Address</Text>
+              {isEditing && (
+                <TouchableOpacity onPress={() => handleEditField('Address', 'location.address', displayData.address)}>
+                  <Feather name="edit-2" size={12} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
             <Text style={styles.addressText}>{displayData.address}</Text>
+            
             <View style={styles.addressDetails}>
               <View style={styles.addressItem}>
-                <Text style={styles.addressLabel}>State</Text>
+                <View style={styles.infoLabelRow}>
+                  <Text style={styles.addressLabel}>State</Text>
+                  {isEditing && (
+                    <TouchableOpacity onPress={() => handleEditField('State', 'location.region', displayData.state)}>
+                      <Feather name="edit-2" size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={styles.addressValue}>{displayData.state}</Text>
               </View>
               <View style={styles.addressItem}>
-                <Text style={styles.addressLabel}>District</Text>
+                <View style={styles.infoLabelRow}>
+                  <Text style={styles.addressLabel}>District</Text>
+                  {isEditing && (
+                    <TouchableOpacity onPress={() => handleEditField('District', 'location.district', displayData.district)}>
+                      <Feather name="edit-2" size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={styles.addressValue}>{displayData.district}</Text>
               </View>
               <View style={styles.addressItem}>
-                <Text style={styles.addressLabel}>Pincode</Text>
+                <View style={styles.infoLabelRow}>
+                  <Text style={styles.addressLabel}>Pincode</Text>
+                  {isEditing && (
+                    <TouchableOpacity onPress={() => handleEditField('Pincode', 'location.pincode', displayData.pincode)}>
+                      <Feather name="edit-2" size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={styles.addressValue}>{displayData.pincode}</Text>
               </View>
             </View>
@@ -336,13 +443,34 @@ export default function FarmerProfileScreen() {
             </View>
             
             <View style={styles.bankCard}>
-              <Text style={styles.bankName}>{displayData.bankName}</Text>
+              <View style={styles.infoLabelRow}>
+                <Text style={styles.bankName}>{displayData.bankName}</Text>
+                {isEditing && (
+                  <TouchableOpacity onPress={() => handleEditField('Bank Name', 'bank.bankName', displayData.bankName)}>
+                    <Feather name="edit-2" size={12} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.bankDetails}>
-                <Text style={styles.bankLabel}>Account No.</Text>
+                <View style={styles.infoLabelRow}>
+                  <Text style={styles.bankLabel}>Account No.</Text>
+                  {isEditing && (
+                    <TouchableOpacity onPress={() => handleEditField('Account No.', 'bank.accountNumber', displayData.accountNumber)}>
+                      <Feather name="edit-2" size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={styles.bankValue}>{displayData.accountNumber}</Text>
               </View>
               <View style={styles.bankDetails}>
-                <Text style={styles.bankLabel}>IFSC Code</Text>
+                <View style={styles.infoLabelRow}>
+                  <Text style={styles.bankLabel}>IFSC Code</Text>
+                  {isEditing && (
+                    <TouchableOpacity onPress={() => handleEditField('IFSC Code', 'bank.ifscCode', displayData.ifscCode)}>
+                      <Feather name="edit-2" size={12} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={styles.bankValue}>{displayData.ifscCode}</Text>
               </View>
             </View>
@@ -771,6 +899,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.content,
+  },
+  infoLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   rowSection: {
     flexDirection: 'row',

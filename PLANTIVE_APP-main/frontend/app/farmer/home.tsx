@@ -1,12 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Platform } from 'react-native';
+import * as Location from 'expo-location';
 import { COLORS } from '../../constants/colors';
 import { router } from 'expo-router';
 import { API_ENDPOINTS, getAuthHeaders } from '../../constants/api';
 
 export default function FarmerHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [location, setLocation] = useState<string>('Detecting...');
+  const [weather, setWeather] = useState({
+    temp: '--',
+    condition: 'Detecting...',
+    rainfall: '--',
+    humidity: '--'
+  });
+
+  const fetchFarmerProfile = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.FARMERS.PROFILE, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setProfile(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
 
   const fetchRecentActivity = async () => {
     try {
@@ -29,13 +52,53 @@ export default function FarmerHomeScreen() {
     }
   };
 
+  const fetchLocationAndWeather = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocation('Permission Denied');
+        setWeather(prev => ({ ...prev, condition: 'No location access' }));
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({});
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude
+      });
+
+      if (reverseGeocode.length > 0) {
+        const place = reverseGeocode[0];
+        setLocation(place.city || place.region || place.district || 'Local Farm');
+      }
+
+      // Simulated weather fetch
+      setWeather({
+        temp: '28',
+        condition: 'Clear Sky',
+        rainfall: '0.2',
+        humidity: '65'
+      });
+    } catch (error) {
+      console.error('Error getting location/weather:', error);
+      setLocation('Local Farm');
+      setWeather(prev => ({ ...prev, condition: 'Error fetching' }));
+    }
+  };
+
   useEffect(() => {
     fetchRecentActivity();
+    fetchFarmerProfile();
+    fetchLocationAndWeather();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchRecentActivity();
+    await Promise.all([
+      fetchRecentActivity(), 
+      fetchFarmerProfile(),
+      fetchLocationAndWeather()
+    ]);
     setRefreshing(false);
   };
 
@@ -46,45 +109,54 @@ export default function FarmerHomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Weather Card - MOCK BUT CLEANER */}
+      {/* Weather Card - MATCHING SCREENSHOT */}
       <View style={styles.weatherCard}>
         <View style={styles.weatherHeader}>
           <Text style={styles.weatherTitle}>Current Conditions</Text>
-          <Text style={styles.weatherLocation}>📍 Local Farm</Text>
+          <View style={styles.locationContainer}>
+             <Text style={styles.weatherLocation}>📍 {location}</Text>
+          </View>
         </View>
         <View style={styles.weatherContent}>
           <View style={styles.weatherMain}>
-            <Text style={styles.temperature}>--°C</Text>
-            <Text style={styles.weatherCondition}>Syncing...</Text>
+            <Text style={styles.temperature}>{weather.temp}°C</Text>
+            <Text style={styles.weatherCondition}>{weather.condition}</Text>
           </View>
-          <View style={styles.weatherDetails}>
-            <View style={styles.weatherItem}>
+          <View style={styles.weatherStats}>
+            <View style={styles.weatherStatItem}>
               <Text style={styles.weatherLabel}>Rainfall</Text>
-              <Text style={styles.weatherValue}>-- mm</Text>
+              <Text style={styles.weatherValue}>{weather.rainfall} mm</Text>
             </View>
-            <View style={styles.weatherItem}>
+            <View style={styles.weatherStatItem}>
               <Text style={styles.weatherLabel}>Humidity</Text>
-              <Text style={styles.weatherValue}>--%</Text>
+              <Text style={styles.weatherValue}>{weather.humidity}%</Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Insurance Coverage - REMOVED DUMMY NUMBERS */}
+      {/* Insurance Coverage - MATCHING SCREENSHOT */}
       <View style={styles.insuranceCard}>
         <Text style={styles.insuranceTitle}>Insurance Policy</Text>
-        <View style={styles.insuranceDetails}>
-          <View style={styles.insuranceItem}>
+        <View style={styles.insuranceDetailsRow}>
+          <View style={styles.insuranceInfoGroup}>
             <Text style={styles.insuranceLabel}>Scheme</Text>
-            <Text style={styles.insuranceValue}>PMFBY Integrated</Text>
+            <Text style={styles.insuranceValue}>{profile?.insurance?.scheme || 'PMFBY Integrated'}</Text>
           </View>
-          <View style={styles.insuranceItem}>
+          <View style={styles.insuranceInfoGroup}>
             <Text style={styles.insuranceLabel}>Status</Text>
-            <Text style={[styles.insuranceValue, { color: COLORS.primary }]}>Active</Text>
+            <Text style={[styles.insuranceValue, { 
+              color: profile?.insurance?.status === 'active' ? COLORS.primary : COLORS.warning 
+            }]}>
+              {profile?.insurance?.status || 'Active'}
+            </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.coverageButton}>
-          <Text style={styles.coverageButtonText}>Check Status</Text>
+        <TouchableOpacity 
+          style={styles.checkStatusBtn}
+          onPress={() => router.push('/farmer/status')}
+        >
+          <Text style={styles.checkStatusBtnText}>Check Policy Details</Text>
         </TouchableOpacity>
       </View>
 
@@ -170,110 +242,121 @@ const styles = StyleSheet.create({
   },
   weatherCard: {
     backgroundColor: COLORS.white,
-    margin: 20,
+    marginHorizontal: 15,
+    marginTop: 20,
     padding: 20,
-    borderRadius: 20,
-    elevation: 4,
+    borderRadius: 24,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   weatherHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    alignItems: 'center',
+    marginBottom: 20,
   },
   weatherTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
     color: COLORS.content,
   },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   weatherLocation: {
-    color: COLORS.gray,
+    fontSize: 12,
+    color: '#d14a61', // Adjusting to match pinpoint icon color in snapshot
+    fontWeight: '500',
   },
   weatherContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   weatherMain: {
     flex: 1,
   },
   temperature: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: 42,
+    fontWeight: '700',
     color: COLORS.primary,
+    marginBottom: 2,
   },
   weatherCondition: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.gray,
+    fontWeight: '400',
   },
-  weatherDetails: {
-    flex: 1,
+  weatherStats: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: 30,
   },
-  weatherItem: {
+  weatherStatItem: {
     alignItems: 'center',
   },
   weatherLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: COLORS.gray,
+    marginBottom: 4,
   },
   weatherValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.content,
   },
   insuranceCard: {
     backgroundColor: COLORS.white,
-    marginHorizontal: 20,
+    marginHorizontal: 15,
+    marginTop: 15,
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 24,
     elevation: 2,
   },
   insuranceTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
     color: COLORS.content,
     marginBottom: 15,
   },
-  insuranceDetails: {
+  insuranceDetailsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginBottom: 20,
   },
-  insuranceItem: {
-    flex: 1,
+  insuranceInfoGroup: {
+    gap: 4,
   },
   insuranceLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: COLORS.gray,
   },
   insuranceValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: COLORS.content,
   },
-  coverageButton: {
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: 10,
+  checkStatusBtn: {
+    backgroundColor: '#f1f5ef', // Matching the pale greenish background in snapshot
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
   },
-  coverageButtonText: {
+  checkStatusBtnText: {
     color: COLORS.primary,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontSize: 14,
   },
   actionsContainer: {
-    padding: 20,
+    paddingHorizontal: 15,
+    marginTop: 25,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '800',
     color: COLORS.content,
     marginBottom: 15,
   },
@@ -284,59 +367,65 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     backgroundColor: COLORS.white,
-    width: '48%',
-    padding: 15,
-    borderRadius: 20,
-    marginBottom: 15,
+    width: '48.5%',
+    padding: 18,
+    borderRadius: 22,
+    marginBottom: 12,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
   },
   actionIcon: {
-    backgroundColor: COLORS.background,
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    backgroundColor: '#f8faf7',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   actionIconText: {
     fontSize: 20,
   },
   actionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
     color: COLORS.content,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   actionDescription: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.gray,
+    lineHeight: 14,
   },
   recentContainer: {
-    padding: 20,
-    paddingTop: 0,
+    paddingHorizontal: 15,
+    marginTop: 20,
+    marginBottom: 30,
   },
   recentList: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 15,
     elevation: 2,
   },
   recentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    borderBottomColor: '#f0f0f0',
   },
   recentIcon: {
-    backgroundColor: COLORS.background,
-    width: 35,
-    height: 35,
-    borderRadius: 18,
+    backgroundColor: '#f8faf7',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   recentIconText: {
     fontSize: 16,
@@ -346,16 +435,17 @@ const styles = StyleSheet.create({
   },
   recentTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: COLORS.content,
   },
   recentTime: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.gray,
+    marginTop: 2,
   },
   recentStatus: {
     fontSize: 12,
     color: COLORS.primary,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });

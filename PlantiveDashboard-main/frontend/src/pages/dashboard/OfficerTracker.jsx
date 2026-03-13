@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers } from '../../services/api/users.api';
+import { getOfficials } from '../../services/api/officials.api';
 import {
   Search, Filter, MapPin, Phone, Mail, Calendar,
   CheckCircle, XCircle, Clock, User, Shield,
@@ -21,23 +21,24 @@ const OfficerTracker = () => {
     const fetchRealOfficers = async () => {
       try {
         setLoading(true);
-        const res = await getUsers({ role: 'agriofficer' });
+        const res = await getOfficials();
         const data = res.data || (Array.isArray(res) ? res : []);
         
         const mappedOfficers = data.map((o, idx) => ({
           id: o._id,
-          name: o.name || 'Unknown Officer',
-          badgeNumber: `OFF-${(idx + 1).toString().padStart(3, '0')}`,
-          phone: o.phone || '+91 XXXXX XXXXX',
-          email: o.email || 'N/A',
-          location: o.district || 'Unknown',
-          district: o.district || 'Unknown',
-          status: o.status || 'active',
-          lastActive: o.lastActivity ? new Date(o.lastActivity).toISOString() : new Date().toISOString(),
-          totalVisits: 0,
-          completedVisits: 0,
-          pendingVisits: 0,
+          name: o.userId?.name || 'Unknown Officer',
+          badgeNumber: o.employeeId || `OFF-${(idx + 1).toString().padStart(3, '0')}`,
+          phone: o.userId?.phone || '+91 XXXXX XXXXX',
+          email: o.userId?.email || 'N/A',
+          location: o.userId?.district || o.assignedDistricts?.[0] || 'Unknown',
+          district: o.userId?.district || o.assignedDistricts?.[0] || 'Unknown',
+          status: o.userId?.status || (o.isAvailable ? 'active' : 'inactive'),
+          lastActive: o.userId?.lastActivity ? new Date(o.userId.lastActivity).toISOString() : new Date().toISOString(),
+          totalVisits: o.verificationCount || 0,
+          completedVisits: o.verificationCount || 0,
+          pendingVisits: o.pendingVerifications || 0,
           performance: 100,
+          recentActivities: o.recentActivities || [],
           currentAssignment: null,
           coordinates: { lat: 18.5204 + (Math.random() - 0.5), lng: 73.8567 + (Math.random() - 0.5) }
         }));
@@ -275,27 +276,23 @@ const OfficerTracker = () => {
             <div className="bg-white rounded-2xl shadow-lg border border-green-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium">Farm Visit Completed</div>
-                    <div className="text-sm text-gray-600">Ramesh Patil - Soybean</div>
+                {officer.recentActivities && officer.recentActivities.length > 0 ? (
+                  officer.recentActivities.map((activity, idx) => (
+                    <div key={activity.id || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="font-medium">{activity.title}</div>
+                        <div className="text-sm text-gray-600">{activity.description}</div>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {new Date(activity.time).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500 italic">
+                    No recent activities recorded for this official
                   </div>
-                  <div className="text-sm text-gray-500">2 hours ago</div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium">Damage Assessment</div>
-                    <div className="text-sm text-gray-600">Suresh Yadav - Cotton</div>
-                  </div>
-                  <div className="text-sm text-gray-500">5 hours ago</div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium">Report Submitted</div>
-                    <div className="text-sm text-gray-600">Weather damage analysis</div>
-                  </div>
-                  <div className="text-sm text-gray-500">1 day ago</div>
-                </div>
+                )}
               </div>
             </div>
           </div>

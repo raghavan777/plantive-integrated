@@ -41,8 +41,8 @@ export default function FarmerStatusScreen() {
             stage: sub.data?.cropStage || 'Vegetative',
             date: new Date(sub.createdAt).toLocaleDateString(),
             steps,
-            status: sub.status === 'verified' ? 'approved' : 'processing',
-            claimAmount: sub.status === 'verified' ? '₹ --' : 'Pending',
+            status: sub.status === 'verified' ? 'approved' : (sub.status === 'rejected' ? 'rejected' : 'processing'),
+            claimAmount: sub.status === 'verified' ? `₹ ${sub.data?.estimatedYield ? (sub.data.estimatedYield * 100).toLocaleString() : '5,000'}` : 'Pending',
           };
         });
         setStatusData(mapped);

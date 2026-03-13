@@ -6,7 +6,7 @@ const roleSchema = new mongoose.Schema({
         required: [true, 'Role name is required'],
         unique: true,
         trim: true,
-        enum: ['district_officer']
+        enum: ['district_officer', 'agriofficer']
     },
     permissions: [{
         type: String,
@@ -51,6 +51,17 @@ roleSchema.statics.initializeRoles = async function () {
                 'settings:read', 'settings:write'
             ],
             description: 'District Officer Access (Full System Access)'
+        },
+        {
+            name: 'agriofficer',
+            permissions: [
+                'farmers:read',
+                'plots:read',
+                'submissions:read', 'submissions:verify',
+                'images:read',
+                'reports:read', 'reports:write'
+            ],
+            description: 'Field Agricultural Officer'
         }
     ];
 

@@ -1,6 +1,29 @@
 import React, { useState, useEffect } from 'react'
 import { getPlots } from '../../services/api/plots.api'
-import { Search, Filter, Download, AlertTriangle, MapPin } from 'lucide-react'
+import { Search, Filter, Download, AlertTriangle, MapPin, ExternalLink } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import L from 'leaflet'
+
+// Fix for default Leaflet icon issues in React
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: markerIcon2x,
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+});
+
+const getHealthColor = (health) => {
+  switch (health) {
+    case 'Good': return '#10b981';
+    case 'Moderate': return '#f59e0b';
+    case 'Damage': return '#ef4444';
+    default: return '#6b7280';
+  }
+};
 
 const MapMonitor = () => {
   const [plots, setPlots] = useState([])
@@ -118,30 +141,56 @@ const MapMonitor = () => {
         </div>
       </div>
 
-      {/* Map Placeholder */}
-      <div className="glass-panel rounded-3xl overflow-hidden premium-shadow p-1.5">
-        <div className="h-96 lg:h-[500px] relative bg-linear-to-br from-brand-50 to-blue-50/50 rounded-2xl flex items-center justify-center overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-brand-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-          
-          <div className="text-center relative z-10 glass-panel p-8 rounded-3xl border-white/60">
-            <MapPin className="h-16 w-16 text-brand-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-gray-800 font-heading mb-2">Interactive Map Area</h3>
-            <p className="text-[15px] font-medium text-gray-500 mb-6">Map visualization will be integrated here</p>
-            <div className="flex gap-4 justify-center bg-white/60 py-2.5 px-6 rounded-xl border border-gray-100/80 backdrop-blur-sm">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-emerald-500 rounded-full mr-2"></div>
-                <span className="text-sm font-semibold text-gray-600">Good Health</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-                <span className="text-sm font-semibold text-gray-600">Moderate</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                <span className="text-sm font-semibold text-gray-600">Damage</span>
-              </div>
-            </div>
+      {/* Map Visualization */}
+      <div className="glass-panel rounded-3xl overflow-hidden premium-shadow p-1.5 min-h-[500px]">
+        <div className="h-[500px] w-full relative rounded-2xl overflow-hidden mb-4">
+          <MapContainer 
+            center={[20.5937, 78.9629]} 
+            zoom={5} 
+            className="h-full w-full z-0"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {filteredPlots.map((plot) => (
+              <Marker 
+                key={plot.id} 
+                position={[
+                  plot.position?.[1] || 20.5937, 
+                  plot.position?.[0] || 78.9629
+                ]}
+              >
+                <Popup>
+                  <div className="p-1 min-w-[150px]">
+                    <h4 className="font-bold text-gray-900 border-b pb-1 mb-2">{plot.farmerName}</h4>
+                    <div className="space-y-1 text-sm">
+                      <p className="flex justify-between"><span>Crop:</span> <span className="font-semibold">{plot.crop}</span></p>
+                      <p className="flex justify-between"><span>Status:</span> <span className="font-semibold">{plot.stage}</span></p>
+                      <p className="flex justify-between">
+                        <span>Health:</span> 
+                        <span style={{ color: getHealthColor(plot.health) }} className="font-bold">{plot.health}</span>
+                      </p>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
+        
+        <div className="px-6 py-4 flex flex-wrap gap-6 justify-center border-t border-gray-100 bg-white/40">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-emerald-500 rounded-full mr-2"></div>
+            <span className="text-sm font-semibold text-gray-600 uppercase tracking-tighter">Good Health</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+            <span className="text-sm font-semibold text-gray-600 uppercase tracking-tighter">Moderate Status</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+            <span className="text-sm font-semibold text-gray-600 uppercase tracking-tighter">Damage Reported</span>
           </div>
         </div>
       </div>

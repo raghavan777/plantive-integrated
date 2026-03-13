@@ -23,31 +23,43 @@ const FarmerTracker = () => {
         const res = await getFarmers();
         const data = res.data || (Array.isArray(res) ? res : []);
         
-        const mappedData = data.map(f => ({
-          id: f._id,
-          name: f.name || 'Unknown',
-          farmerId: f.farmerId || f._id.substring(0, 8),
-          phone: f.contact?.phone || 'N/A',
-          email: f.contact?.email || 'N/A',
-          village: f.location?.village || f.location?.address || 'N/A',
-          district: f.location?.district || 'N/A',
-          state: f.location?.state || 'N/A',
-          totalPlots: f.plots?.length || 0,
-          totalArea: typeof f.totalArea === 'number' ? `${f.totalArea} acres` : (f.totalArea || '0 acres'),
-          joinedDate: f.createdAt ? new Date(f.createdAt).toISOString().split('T')[0] : 'N/A',
-          lastSubmission: f.lastAppActivity ? new Date(f.lastAppActivity).toISOString().split('T')[0] : null,
-          submissionStatus: f.status === 'active' ? 'completed' : 'pending',
-          submissionStage: 'Stage 1',
-          imageQuality: 'good',
-          aiConfidence: 85,
-          status: f.status || 'active',
-          crops: Array.isArray(f.crops) ? f.crops : ['Unknown'],
-          progress: 50,
-          submissions: [],
-          officerAssigned: 'Unassigned',
-          nextDeadline: null,
-          notes: ''
-        }));
+        const mappedData = data.map(f => {
+          const totalPlots = f.plots?.length || 0;
+          const avgHealthScore = totalPlots > 0 
+            ? Math.round(f.plots.reduce((acc, p) => acc + (p.healthScore || 0), 0) / totalPlots)
+            : 0;
+            
+          // Simple progress calculation: plots with non-unknown health status
+          const progress = totalPlots > 0
+            ? Math.round((f.plots.filter(p => p.healthStatus && p.healthStatus !== 'unknown').length / totalPlots) * 100)
+            : 0;
+
+          return {
+            id: f._id,
+            name: f.name || 'Unknown',
+            farmerId: f.farmerId || f.pmfbyId || f._id.substring(0, 8),
+            phone: f.contact?.phone || 'N/A',
+            email: f.contact?.email || 'N/A',
+            village: f.location?.village || f.location?.address || 'N/A',
+            district: f.location?.district || 'N/A',
+            state: f.location?.state || 'N/A',
+            totalPlots: totalPlots,
+            totalArea: typeof f.totalArea === 'number' ? `${f.totalArea} hectares` : (f.totalArea || '0 hectares'),
+            joinedDate: f.createdAt ? new Date(f.createdAt).toISOString().split('T')[0] : 'N/A',
+            lastSubmission: f.updatedAt ? new Date(f.updatedAt).toISOString().split('T')[0] : null,
+            submissionStatus: progress === 100 ? 'completed' : (progress > 0 ? 'pending' : 'not_started'),
+            submissionStage: progress === 100 ? 'Verified' : 'Inspection',
+            imageQuality: avgHealthScore > 80 ? 'excellent' : (avgHealthScore > 50 ? 'good' : 'poor'),
+            aiConfidence: avgHealthScore || 85,
+            status: f.status || 'active',
+            crops: Array.isArray(f.crops) ? f.crops : (f.plots?.map(p => p.cropType) || ['Unknown']),
+            progress: progress,
+            submissions: [],
+            officerAssigned: f.metadata?.get('assignedOfficer') || 'Unassigned',
+            nextDeadline: f.metadata?.get('nextDeadline') || null,
+            notes: f.notes || ''
+          };
+        });
         
         setFarmers(mappedData);
         if (mappedData.length > 0) setSelectedFarmer(mappedData[0]);
@@ -424,7 +436,7 @@ const FarmerTracker = () => {
           <div className="text-4xl font-bold text-gray-800 font-heading">{farmers.length}</div>
           <div className="text-[13px] font-semibold tracking-wide text-gray-500 uppercase mt-2">Total Farmers</div>
         </div>
-        <div className="glass-panel p-6 rounded-3xl hover-lift text-center bg-gradient-to-br from-white to-brand-50/50">
+        <div className="glass-panel p-6 rounded-3xl hover-lift text-center bg-linear-to-br from-white to-brand-50/50">
           <div className="text-4xl font-bold text-brand-600 font-heading">
             {farmers.filter(f => f.submissionStatus === 'completed').length}
           </div>

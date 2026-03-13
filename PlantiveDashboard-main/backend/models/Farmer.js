@@ -76,6 +76,26 @@ const farmerSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    pmfbyId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    insurance: {
+        policyNumber: String,
+        scheme: {
+            type: String,
+            default: 'PMFBY Integrated'
+        },
+        status: {
+            type: String,
+            enum: ['active', 'expired', 'pending'],
+            default: 'active'
+        },
+        coverageAmount: Number,
+        premiumPaid: Number,
+        validUntil: Date
+    },
     metadata: {
         type: Map,
         of: String
